@@ -1,8 +1,12 @@
 use dioxus::prelude::*;
+use std::time::Duration;
+
+mod audio;
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
+const PICO_CSS: Asset = asset!("/assets/pico.min.css");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
-const HEADER_SVG: Asset = asset!("/assets/header.svg");
+const ISHE_LOGO: Asset = asset!("/assets/ishe.gif");
 
 fn main() {
     dioxus::launch(App);
@@ -12,59 +16,25 @@ fn main() {
 fn App() -> Element {
     rsx! {
         document::Link { rel: "icon", href: FAVICON }
+        document::Link { rel: "stylesheet", href: PICO_CSS }
         document::Link { rel: "stylesheet", href: MAIN_CSS }
-        Hero {}
-        Echo {}
-    }
-}
 
-#[component]
-pub fn Hero() -> Element {
-    rsx! {
-        div {
-            id: "hero",
-            img { src: HEADER_SVG, id: "header" }
-            div { id: "links",
-                a { href: "https://dioxuslabs.com/learn/0.6/", "📚 Learn Dioxus" }
-                a { href: "https://dioxuslabs.com/awesome", "🚀 Awesome Dioxus" }
-                a { href: "https://github.com/dioxus-community/", "📡 Community Libraries" }
-                a { href: "https://github.com/DioxusLabs/sdk", "⚙️ Dioxus Development Kit" }
-                a { href: "https://marketplace.visualstudio.com/items?itemName=DioxusLabs.dioxus", "💫 VSCode Extension" }
-                a { href: "https://discord.gg/XgGxMSkvUM", "👋 Community Discord" }
+        main { class: "container",
+            Welcome {
+                onclick: move |_| audio::play_sine_for(440.0, Duration::from_millis(250)).unwrap()
             }
         }
     }
 }
 
-/// Echo component that demonstrates fullstack server functions.
 #[component]
-fn Echo() -> Element {
-    let mut response = use_signal(|| String::new());
-
+fn Welcome(onclick: EventHandler<MouseEvent>) -> Element {
     rsx! {
-        div {
-            id: "echo",
-            h4 { "ServerFn Echo" }
-            input {
-                placeholder: "Type here to echo...",
-                oninput:  move |event| async move {
-                    let data = echo_server(event.value()).await.unwrap();
-                    response.set(data);
-                },
-            }
-
-            if !response().is_empty() {
-                p {
-                    "Server echoed: "
-                    i { "{response}" }
-                }
-            }
+        img { src: ISHE_LOGO }
+        h1 { "Welcome!" }
+        button {
+            onclick: move |evt| onclick.call(evt),
+            "Start"
         }
     }
-}
-
-/// Echo the user input on the server.
-#[server(EchoServer)]
-async fn echo_server(input: String) -> Result<String, ServerFnError> {
-    Ok(input)
 }
