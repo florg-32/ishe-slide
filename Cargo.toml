@@ -1,21 +1,36 @@
 [package]
-name = "ishe-slide"
-version = "0.1.0"
 authors = ["Florian Guggi <f.guggi@viewpointsystem.com>"]
 edition = "2021"
+name = "ishe-slide"
+version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-dioxus = { version = "0.6.0", features = ["fullstack"] }
+csv = "1.3.1"
+dioxus = { version = "0.6.0", features = ["fullstack", "router"] }
 gloo = "0.11.0"
-web-sys = { version = "0.3.77", features = ["AudioContext", "AudioDestinationNode", "AudioParam", "GainNode", "OscillatorNode", "OscillatorType"] }
+js-sys = "0.3.77"
+web-sys = { version = "0.3.77", features = [
+    "AudioContext",
+    "AudioDestinationNode",
+    "AudioParam",
+    "Element",
+    "GainNode",
+    "HtmlAnchorElement",
+    "Node",
+    "OscillatorNode",
+    "OscillatorType",
+    "Performance",
+    "PerformanceTiming",
+] }
+zip = { version = "3.0.0", default-features = false, features = ["deflate"] }
 
 [features]
 default = ["web"]
-web = ["dioxus/web"]
 desktop = ["dioxus/desktop"]
 mobile = ["dioxus/mobile"]
+web = ["dioxus/web"]
 
 [profile]
 
