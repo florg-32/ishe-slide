@@ -4,56 +4,71 @@
 
 html,
 body {
-    height: 100%;
+    height: calc(100svh + 1px);
+    /* we need a scrollbar, so that overscroll-behavior: none; works */
+    /* overflow: hidden; */
     margin: 0;
     overscroll-behavior: none !important;
 }
 
 #main {
-    height: calc(100% + 1px);
-    /* we need a scrollbar, so that overscroll-behavior: none; works */
-    overflow: hidden;
+    height: 100svh;
 }
 
 main {
+    height: 100svh;
+    padding-top: 20px;
+    padding-bottom: 2cm;
+
     display: flex;
     flex-direction: column;
-    height: 100%;
-    padding-top: 20px;
-    padding-bottom: 20px;
+    row-gap: 20px;
+    justify-content: space-between;
+}
+
+div[id="slider"] {
+    min-height: 0;
+    position: relative;
+    max-height: 12cm;
 }
 
 input[type="range"] {
-    padding-top: 20px;
     writing-mode: vertical-lr;
     direction: rtl;
-    flex: 1 0 auto;
     touch-action: none;
+    height: 100%;
+    margin: 0;
+    border: 1px solid #00000052;
 }
 
-input[type=range]::-webkit-slider-thumb {
+input[type=range]::-webkit-slider-thumb,
+input[type=range]::-moz-range-thumb {
     -webkit-appearance: none;
     border: 1px solid #00a6b8;
     height: 4px;
     width: calc(100% - 2px);
     border-radius: 3px;
-    background: #505050;
+    background: #5050502c;
     cursor: pointer;
     margin-top: -14px;
 }
 
-input[type=range]::-moz-range-thumb {
-    appearance: none;
-    border: 1px solid #001892;
-    height: 4px;
-    width: 99%;
-    border-radius: 3px;
-    background: #000000;
-    cursor: pointer;
-    margin-top: -14px;
+div[id="slider"]>hr {
+    position: absolute;
+    top: 50%;
+    width: 100%;
+    border-top: 1px solid var(--pico-color-amber);
+    margin: 0;
+    pointer-events: none;
 }
 
-article > div {
+div[id="slider"]>div {
+    position: absolute;
+    pointer-events: none;
+    padding: 5px;
+}
+
+article>div {
     display: flex;
     flex-direction: column;
     gap: 10px;

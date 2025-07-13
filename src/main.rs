@@ -39,7 +39,7 @@ enum State {
     Recording,
 }
 
-static SAMPLES: GlobalSignal<Vec<(f64, u8)>> = Signal::global(Vec::new);
+static SAMPLES: GlobalSignal<Vec<(f64, i16)>> = Signal::global(Vec::new);
 
 #[component]
 fn App() -> Element {
@@ -75,9 +75,11 @@ fn App() -> Element {
 #[component]
 fn Welcome(onstart: EventHandler<MouseEvent>) -> Element {
     rsx! {
-        img { src: ISHE_LOGO }
-        h1 { "Welcome!" }
-        button { onclick: move |evt| onstart.call(evt), "Start" }
+        div {
+            img { src: ISHE_LOGO }
+            h1 { "Welcome!" }
+            button { onclick: move |evt| onstart.call(evt), "Start" }
+        }
     }
 }
 
@@ -88,16 +90,25 @@ fn Recording(start_time: f64, onrestart: EventHandler<MouseEvent>) -> Element {
 
     rsx! {
         button { onclick: move |_| session_ended.set(true), "End Session" }
-        input {
-            r#type: "range",
-            min: 0,
-            max: 100,
-            step: 1,
-            oninput: move |evt| {
-                SAMPLES
-                    .write()
-                    .push((js_sys::Date::now() - start_time, evt.value().parse::<u8>().unwrap()))
-            },
+        div { id: "slider",
+            input {
+                r#type: "range",
+                min: -100,
+                max: 100,
+                step: 1,
+                value: 0,
+                oninput: move |evt| {
+                    SAMPLES
+                        .write()
+                        .push((
+                            js_sys::Date::now() - start_time,
+                            evt.value().parse::<i16>().unwrap(),
+                        ))
+                },
+            }
+            hr {}
+            div { style: "top: 0%;", "+100 😀" }
+            div { style: "top: 100%; transform: translateY(-100%);", "-100 😖" }
         }
         dialog { open: session_ended.read().to_string(),
             article {
@@ -143,7 +154,7 @@ fn Recording(start_time: f64, onrestart: EventHandler<MouseEvent>) -> Element {
     }
 }
 
-fn prepare_file(start_time: f64, samples: &[(f64, u8)]) -> (String, Vec<u8>) {
+fn prepare_file(start_time: f64, samples: &[(f64, i16)]) -> (String, Vec<u8>) {
     let date = js_sys::Date::new(&JsValue::from_f64(start_time));
     let name = format!(
         "{}-{}.csv",

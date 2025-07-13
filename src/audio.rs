@@ -1,6 +1,6 @@
 use gloo::timers::callback::Timeout;
 use std::time::Duration;
-use web_sys::{wasm_bindgen::JsValue, OscillatorType};
+use web_sys::{OscillatorType, wasm_bindgen::JsValue};
 
 pub fn play_sine_for(freq: f32, end_freq: f32, duration: Duration) -> Result<(), JsValue> {
     let ctx = web_sys::AudioContext::new()?;
