@@ -196,11 +196,11 @@ async fn list_recordings() -> Result<Vec<String>, ServerFnError> {
 
 #[server]
 async fn delete_recording(name: String) -> Result<(), ServerFnError> {
-    let path = PathBuf::from(name);
-    if !path.parent().unwrap().as_os_str().is_empty() {
-        return Err(ServerFnError::new("invalid path"));
+    if !name.ends_with(".csv") {
+        return Err(ServerFnError::new("Invalid file"));
     }
 
+    let path = PathBuf::from("./").join(name);
     Ok(std::fs::remove_file(path)?)
 }
 
