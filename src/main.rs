@@ -1,6 +1,10 @@
+use chrono::Local;
 use dioxus::prelude::*;
 use std::io::Write;
+#[cfg(feature = "mobile")]
+use std::path::Path;
 use std::path::PathBuf;
+#[cfg(feature = "web")]
 use web_sys::wasm_bindgen::{JsCast, JsValue};
 use zip::{ZipWriter, write::SimpleFileOptions};
 
@@ -39,20 +43,21 @@ enum State {
     Recording,
 }
 
-static SAMPLES: GlobalSignal<Vec<(f64, i16)>> = Signal::global(Vec::new);
+static SAMPLES: GlobalSignal<Vec<(i64, i16)>> = Signal::global(Vec::new);
 
 #[component]
 fn App() -> Element {
     let mut state = use_signal(|| State::Start);
-    let mut start_time = use_signal(|| 0.0);
+    let mut start_time = use_signal(chrono::Local::now);
 
     let app = match *state.read() {
         State::Start => rsx! {
             Welcome {
-                onstart: move |_| {
-                    audio::play_pattern().unwrap();
-                    start_time.set(js_sys::Date::now());
+                onstart: move |_| { async move {
+                    start_time.set(chrono::Local::now());
                     state.set(State::Recording);
+                    audio::play_pattern().await;
+                }
                 },
             }
         },
@@ -84,7 +89,10 @@ fn Welcome(onstart: EventHandler<MouseEvent>) -> Element {
 }
 
 #[component]
-fn Recording(start_time: f64, onrestart: EventHandler<MouseEvent>) -> Element {
+fn Recording(
+    start_time: chrono::DateTime<chrono::Local>,
+    onrestart: EventHandler<MouseEvent>,
+) -> Element {
     let mut session_ended = use_signal(|| false);
     let mut file_uploaded_class = use_signal(String::new);
 
@@ -101,7 +109,7 @@ fn Recording(start_time: f64, onrestart: EventHandler<MouseEvent>) -> Element {
                     SAMPLES
                         .write()
                         .push((
-                            js_sys::Date::now() - start_time,
+                            (chrono::Local::now() - start_time).num_milliseconds(),
                             evt.value().parse::<i16>().unwrap(),
                         ))
                 },
@@ -124,7 +132,7 @@ fn Recording(start_time: f64, onrestart: EventHandler<MouseEvent>) -> Element {
                     button {
                         onclick: move |_| {
                             let (name, data) = prepare_file(start_time, &SAMPLES.read());
-                            download_file(&data, &name).unwrap();
+                            save_file(&data, &name);
                         },
                         "Save recording"
                     }
@@ -154,13 +162,10 @@ fn Recording(start_time: f64, onrestart: EventHandler<MouseEvent>) -> Element {
     }
 }
 
-fn prepare_file(start_time: f64, samples: &[(f64, i16)]) -> (String, Vec<u8>) {
-    let date = js_sys::Date::new(&JsValue::from_f64(start_time));
-    let name = format!(
-        "{}-{}.csv",
-        date.to_locale_time_string("de-DE"),
-        date.get_milliseconds()
-    );
+#[cfg(not(feature = "server"))]
+fn prepare_file(start_time: chrono::DateTime<Local>, samples: &[(i64, i16)]) -> (String, Vec<u8>) {
+    let mut name = start_time.to_rfc3339();
+    name.push_str(".csv");
 
     let mut wtr = csv::Writer::from_writer(vec![]);
     for s in samples {
@@ -171,23 +176,37 @@ fn prepare_file(start_time: f64, samples: &[(f64, i16)]) -> (String, Vec<u8>) {
     (name, data)
 }
 
-fn download_file(data: &[u8], filename: &str) -> Result<(), JsValue> {
-    let blob = gloo::file::Blob::new(data);
-    let url = gloo::file::ObjectUrl::from(blob);
+#[cfg(feature = "server")]
+fn prepare_file(start_time: chrono::DateTime<Local>, samples: &[(i64, i16)]) -> (String, Vec<u8>) {
+    (String::new(), Vec::new())
+}
 
-    let document = web_sys::window().unwrap().document().unwrap();
-    let anchor = document
-        .create_element("a")?
-        .dyn_into::<web_sys::HtmlAnchorElement>()?;
-    anchor.set_href(&url);
-    anchor.set_download(filename);
-    anchor.set_hidden(true);
+fn save_file(data: &[u8], filename: &str) {
+    #[cfg(feature = "web")]
+    {
+        let blob = gloo::file::Blob::new(data);
+        let url = gloo::file::ObjectUrl::from(blob);
 
-    document.body().unwrap().append_child(&anchor)?;
-    anchor.click();
-    document.body().unwrap().remove_child(&anchor)?;
+        let document = web_sys::window().unwrap().document().unwrap();
+        let anchor = document
+            .create_element("a")
+            .unwrap()
+            .dyn_into::<web_sys::HtmlAnchorElement>()
+            .unwrap();
+        anchor.set_href(&url);
+        anchor.set_download(filename);
+        anchor.set_hidden(true);
 
-    Ok(())
+        document.body().unwrap().append_child(&anchor).unwrap();
+        anchor.click();
+        document.body().unwrap().remove_child(&anchor).unwrap();
+    }
+
+    #[cfg(feature = "mobile")]
+    {
+        let data_path = PathBuf::from(get_cache_dir().unwrap());
+        std::fs::write(data_path.join(filename), data).unwrap();
+    }
 }
 
 #[server]
@@ -237,8 +256,7 @@ fn List() -> Element {
                 value: "Download all",
                 onclick: move |_| {
                     async move {
-                        download_file(&download_all_recordings().await.unwrap(), "recordings.zip")
-                            .unwrap();
+                        save_file(&download_all_recordings().await.unwrap(), "recordings.zip");
                     }
                 },
             }
@@ -264,4 +282,22 @@ fn List() -> Element {
             }
         }
     }
+}
+
+#[cfg(feature = "mobile")]
+fn get_cache_dir() -> anyhow::Result<String> {
+    let ctx = ndk_context::android_context();
+    let vm = unsafe { jni::JavaVM::from_raw(ctx.vm().cast()) }?;
+    let mut env = vm.attach_current_thread()?;
+    let ctx = unsafe { jni::objects::JObject::from_raw(ctx.context().cast()) };
+    let cache_dir = env
+        .call_method(ctx, "getFilesDir", "()Ljava/io/File;", &[])?
+        .l()?;
+    let cache_dir: jni::objects::JString = env
+        .call_method(&cache_dir, "toString", "()Ljava/lang/String;", &[])?
+        .l()?
+        .try_into()?;
+    let cache_dir = env.get_string(&cache_dir)?;
+    let cache_dir = cache_dir.to_str()?;
+    Ok(cache_dir.to_string())
 }
